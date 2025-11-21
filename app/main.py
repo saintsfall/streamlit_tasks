@@ -3,12 +3,23 @@ import pandas as pd
 import unicodedata
 import re
 import plotly.graph_objects as go
+from pathlib import Path
 
 st.set_page_config(layout="wide")
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
+
+def get_available_csv_files():
+    """Retorna uma lista de arquivos CSV disponiveis na pasta data."""
+    data_dir = Path(__file__).parent.parent / "data"
+
+    if data_dir.exists():
+        csv_files = [f.name for f in data_dir.glob("*.csv")]
+        return sorted(csv_files)
+    else:
+        return []
 
 def normalize_name(name):
     """Normaliza nomes de lojas removendo acentos e espaços."""
@@ -233,31 +244,66 @@ SECTION_CONFIG = [
 
 with st.sidebar:
     st.title('Analise de dados')
-    uploaded_file = st.file_uploader("Adicione o CSV")
+
+    # Opção para escolher entre arquivos pré existente ou upload
+    file_source = st.radio(
+        "Fonte dos dados",
+        ["Arquivo pré existente", "Fazer Upload"],
+        help="Escolha entre usar um arquivo já existente ou fazer upload de um novo arquivo"
+    )
+
+    uploaded_file = None
+    selected_file_path = None
+
+    if file_source == 'Arquivo pré existente':
+        available_files = get_available_csv_files()
+
+        if available_files:
+            selected_file = st.selectbox(
+                "Selecione arquivo CSV",
+                available_files,
+                help="Arquivos disponiveis"
+            )
+
+            if selected_file:
+                data_dir = Path(__file__).parent.parent / "data"
+                selected_file_path = data_dir / selected_file
+        
+        else:
+            st.warning("Nenhum arquivo CSV encontrado")
+    
+    else:
+        uploaded_file = st.file_uploader("Adicione o CSV", type=['csv'])
 
 seller_selected = None
 task_type = None
 df = None
 
 # Carregar e processar arquivo
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
-    df['Nome Normalizado'] = df['Nome da loja (short text)'].apply(normalize_name)
-    
-    with st.sidebar:
-        st.subheader("Filtros")
-        task_type = st.radio(
-            "Tipo de Card",
-            ["Todos", "Tarefas Pai", "Subtarefas"],
-            help="Tarefas Pai: cards sem Parent ID\nSubtarefas: cards com Parent ID"
-        )
+if uploaded_file is not None or selected_file_path is not None:
+    # Carregar do arquivo selecionado ou do upload
+    if file_source == "Arquivo pré existente" and selected_file_path:
+        df = pd.read_csv(selected_file_path)
+    elif uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+
+    if df is not None:
+        df['Nome Normalizado'] = df['Nome da loja (short text)'].apply(normalize_name)
         
-        sellers = df["Nome da loja (short text)"].dropna().unique().tolist()
-        sellers_sorted = sorted(sellers)
-        seller_selected = st.selectbox('Seller', ["Todos"] + sellers_sorted)
+        with st.sidebar:
+            st.subheader("Filtros")
+            task_type = st.radio(
+                "Tipo de Card",
+                ["Todos", "Tarefas Pai", "Subtarefas"],
+                help="Tarefas Pai: cards sem Parent ID\nSubtarefas: cards com Parent ID"
+            )
+            
+            sellers = df["Nome da loja (short text)"].dropna().unique().tolist()
+            sellers_sorted = sorted(sellers)
+            seller_selected = st.selectbox('Seller', ["Todos"] + sellers_sorted)
 
 # Renderizar seções
-if uploaded_file is not None and df is not None:
+if df is not None:
     df_filtered = apply_filters(df, task_type, seller_selected)
     store_count = None
     points_by_seller = None
