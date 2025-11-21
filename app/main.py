@@ -94,7 +94,7 @@ def render_charts(df_filtered):
             height=400
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.subheader("Top 10 - Pontos por Loja")
@@ -116,7 +116,7 @@ def render_charts(df_filtered):
             height=400
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     st.divider()
     
@@ -132,7 +132,7 @@ def render_store_analysis(store_count, points_by_seller):
         'Total de pontos': [points_by_seller.get(store, 0) for store in store_count.index]
     })
     
-    st.dataframe(analysis_df, use_container_width=True, height=400)
+    st.dataframe(analysis_df, width='stretch', height=400)
     st.divider()
 
 def render_all_parent_tasks(df_filtered):
@@ -148,8 +148,13 @@ def render_all_parent_tasks(df_filtered):
         # Adicionar coluna com contagem de subtarefas
         parent_tasks['Total_Subtarefas'] = parent_tasks['Task ID'].map(subtasks_count).fillna(0).astype(int)
         
+        # Criar URL da tarefa pai baseada no Task ID
+        parent_tasks['Task URL'] = parent_tasks['Task ID'].apply(
+            lambda task_id: f"https://app.clickup.com/t/{task_id}" if pd.notna(task_id) else ""
+        )
+        
         # Selecionar colunas relevantes para exibir
-        columns_to_show = ['Task ID', 'Parent Name', 'Nome da loja (short text)', 
+        columns_to_show = ['Task URL', 'Task Name', 'Nome da loja (short text)', 
                           'Pontos de Front (number)', 'Total_Subtarefas']
         
         # Filtrar apenas colunas que existem no DataFrame
@@ -159,7 +164,7 @@ def render_all_parent_tasks(df_filtered):
         # Renomear colunas para melhor visualização
         parent_tasks_display.columns = parent_tasks_display.columns.str.replace('_', ' ')
         
-        st.dataframe(parent_tasks_display, use_container_width=True, height=400)
+        st.dataframe(parent_tasks_display, width='stretch', height=400)
     else:
         st.info("Nenhuma tarefa pai encontrada com os filtros aplicados.")
     
@@ -170,15 +175,31 @@ def render_parent_with_subtasks(df_filtered):
     st.subheader("Cards Pai com suas Subtarefas")
     
     if df_filtered["Parent ID"].notna().any():
-        subtasks = df_filtered[df_filtered["Parent ID"].notna()]
-        parent_count = subtasks.groupby('Parent ID').agg({
-            'Parent Name': 'first',
-            'Task ID': 'count'
-        }).reset_index()
-        parent_count.columns = ['Parent_ID', 'Parent_Name', 'Total_Subtasks']
-        parent_count = parent_count.sort_values('Total_Subtasks', ascending=False)
+        subtasks = df_filtered[df_filtered["Parent ID"].notna()].copy()
         
-        st.dataframe(parent_count, use_container_width=True, height=300)
+        # Criar URL da subtask baseado no Task ID
+        subtasks['Task URL'] = subtasks['Task ID'].apply(
+            lambda task_id: f"https://app.clickup.com/t/{task_id}"
+        )
+
+        # Ordenar por Task ID
+        subtasks = subtasks.sort_values(['Task ID', 'Task Name'])
+
+        # Selecionar colunas relevantes a serem exibidas
+        columns_to_show = [
+            'Parent URL',
+            'Parent Name',
+            'Task Name',
+            'Task URL',
+            'Nome da loja (short text)',
+            'Pontos de Front (number)'
+        ]
+
+        # Filtrar apenas colunas que existem no DataFrame
+        available_columns = [col for col in columns_to_show if col in subtasks.columns]
+        subtasks_display = subtasks[available_columns].copy()
+
+        st.dataframe(subtasks_display, width='stretch', height=400)
     else:
         st.info("Nenhuma subtarefa encontrada com os filtros aplicados.")
     
@@ -187,7 +208,7 @@ def render_parent_with_subtasks(df_filtered):
 def render_filtered_data(df_filtered):
     """Renderiza a tabela completa dos dados filtrados."""
     st.subheader("Dados Filtrados")
-    st.dataframe(df_filtered, use_container_width=True, height=400)
+    st.dataframe(df_filtered, width='stretch', height=400)
 
 # ============================================================================
 # CONFIGURAÇÃO DA ORDEM DAS SEÇÕES
