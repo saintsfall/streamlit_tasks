@@ -62,7 +62,9 @@ def render_metrics(df_filtered):
         st.metric("Total de Cards", total_cards)
     
     with col2:
-        total_pontos = df_filtered["Pontos de Front (number)"].sum()
+        # Converter para numérico, tratando valores não numéricos como NaN
+        pontos_numeric = pd.to_numeric(df_filtered["Pontos de Front (number)"], errors='coerce')
+        total_pontos = pontos_numeric.sum()
         st.metric("Total de Pontos", f"{total_pontos:.0f}" if not pd.isna(total_pontos) else "0")
     
     with col3:
@@ -80,8 +82,10 @@ def render_charts(df_filtered):
     # Contagem de tarefas por loja normalizada
     store_count = df_filtered['Nome Normalizado'].value_counts().sort_values(ascending=False)
     
-    # Pontos por loja normalizada
-    points_by_seller = df_filtered.groupby('Nome Normalizado')['Pontos de Front (number)'].sum().sort_values(ascending=False)
+    # Pontos por loja normalizada - garantir que seja numérico antes de agrupar
+    df_temp = df_filtered.copy()
+    df_temp['Pontos Numericos'] = pd.to_numeric(df_filtered['Pontos de Front (number)'], errors='coerce')
+    points_by_seller = df_temp.groupby('Nome Normalizado')['Pontos Numericos'].sum().sort_values(ascending=False)
     
     col1, col2 = st.columns(2)
     
@@ -289,6 +293,9 @@ if uploaded_file is not None or selected_file_path is not None:
 
     if df is not None:
         df['Nome Normalizado'] = df['Nome da loja (short text)'].apply(normalize_name)
+        # Converter coluna de pontos para numérico, tratando valores não numéricos como NaN
+        if 'Pontos de Front (number)' in df.columns:
+            df['Pontos de Front (number)'] = pd.to_numeric(df['Pontos de Front (number)'], errors='coerce')
         
         with st.sidebar:
             st.subheader("Filtros")
